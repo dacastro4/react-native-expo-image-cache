@@ -15,7 +15,8 @@ type ImageProps = {
     options?: DownloadOptions,
     uri: string,
     transitionDuration?: number,
-    tint?: "dark" | "light"
+    tint?: "dark" | "light",
+    permanent: boolean
 };
 
 type ImageState = {
@@ -29,7 +30,8 @@ export default class Image extends React.Component<ImageProps, ImageState> {
 
     static defaultProps = {
         transitionDuration: 300,
-        tint: "dark"
+        tint: "dark",
+        permanent: false
     };
 
     state = {
@@ -39,7 +41,7 @@ export default class Image extends React.Component<ImageProps, ImageState> {
 
     async load({uri, options = {}}: ImageProps): Promise<void> {
         if (uri) {
-            const path = await CacheManager.get(uri, options).getPath();
+            const path = await CacheManager.get(uri, options).getPath(this.props.permanent);
             if (this.mounted) {
                 this.setState({ uri: path });
             }
