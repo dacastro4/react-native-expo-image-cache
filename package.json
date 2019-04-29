@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/wcandillon/react-native-expo-image-cache#readme",
   "devDependencies": {
+    "@team-griffin/install-self-peers": "^1.1.1",
     "babel-eslint": "^8.2.1",
     "babel-preset-expo": "^4.0.0",
     "eslint": "^4.16.0",
