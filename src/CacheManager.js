@@ -95,14 +95,18 @@ export default class CacheManager {
 }
 
 export const removeCacheEntry = async (uri: string, deletePermanent = false): Promise<> => {
+    let deleted;
+
     if (deletePermanent) {
         await FileSystem.deleteAsync(`${getBaseDir()}/${MD5(uri)}.jpg`, {idempotent: true});
     }
 
-    return FileSystem.deleteAsync(
+    deleted = await FileSystem.deleteAsync(
         `${getTempDir()}/${MD5(uri)}.jpg`,
         {idempotent: true}
-    );
+    )
+
+    return deleted;
 };
 
 const getCacheEntry = async (uri: string, permanent: boolean): Promise<{ exists: boolean, path: string, tmpPath: string }> => {
