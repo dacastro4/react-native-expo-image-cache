@@ -1,6 +1,6 @@
 // @flow
 import {FileSystem} from "expo";
-import SHA1 from "crypto-js/sha1";
+import MD5 from "crypto-js/md5";
 
 export type DownloadOptions = {
     md5?: boolean,
@@ -21,48 +21,56 @@ export class CacheEntry {
     uri: string;
     options: DownloadOptions;
     path: string;
+    permanent: boolean;
 
     constructor(uri: string, options: DownloadOptions) {
         this.uri = uri;
         this.options = options;
+        this.permanent = false;
     }
 
     createBaseDir = async () => {
-        const BASE_DIR = getBaseDir();
-        const TEMP_DIR = getTempDir();
-        const {exists} = FileSystem.getInfoAsync(BASE_DIR);
-        if (!exists) {
-            try {
-                await FileSystem.makeDirectoryAsync(BASE_DIR, {intermediates: true});
-                await FileSystem.makeDirectoryAsync(TEMP_DIR, {intermediates: true});
-            } catch (err) {
-                //do nothing
-            }
+        try {
+            await this.ensureFolderExists(getBaseDir());
+            await this.ensureFolderExists(getTempDir());
+        } catch (err) {
+            // do nothing
         }
     };
 
+    ensureFolderExists = (path: string) => {
+        return FileSystem.getInfoAsync(path)
+            .then(({exists}) => {
+                if (!exists) {
+                    return FileSystem.makeDirectoryAsync(path, {intermediates: true});
+                }
+
+                return Promise.resolve(true);
+            });
+    };
+
     async getPath(permanent: boolean): Promise<?string> {
+        this.permanent = permanent;
         const {uri, options} = this;
-        const {path, exists, tmpPath} = await getCacheEntry(uri);
+        const {path, exists, tmpPath} = await getCacheEntry(uri, this.permanent);
         if (exists) {
-            return path;
+            return permanent ? path : tmpPath;
         }
         this.createBaseDir();
         const result = await FileSystem.createDownloadResumable(uri, tmpPath, options)
             .downloadAsync();
+
         // If the image download failed, we don't cache anything
         if (result && result.status !== 200) {
             return undefined;
         }
 
-        if (!permanent) {
+        if (permanent) {
             await FileSystem.moveAsync({from: tmpPath, to: path});
         }
-        return path;
+        return permanent ? path : tmpPath;
     }
 }
-
-const getCacheKey = (uri: string): string => SHA1(uri);
 
 export default class CacheManager {
 
@@ -76,39 +84,37 @@ export default class CacheManager {
     }
 
     static async clearCache(): Promise<void> {
-        await FileSystem.deleteAsync(TEMP_DIR, {idempotent: true});
-        await FileSystem.makeDirectoryAsync(TEMP_DIR);
+        await FileSystem.deleteAsync(getTempDir(), {idempotent: true});
+        await FileSystem.makeDirectoryAsync(getTempDir());
     }
 
     static async getCacheSize(): Promise<number> {
-        const {size} = await FileSystem.getInfoAsync(TEMP_DIR, {size: true});
+        const {size} = await FileSystem.getInfoAsync(getTempDir(), {size: true});
         return size;
     }
 }
 
 export const removeCacheEntry = async (uri: string, deletePermanent = false): Promise<> => {
-    const key = getCacheKey(uri);
-
     if (deletePermanent) {
-        await FileSystem.deleteAsync(`${getBaseDir()}${key}`, {idempotent: true});
+        await FileSystem.deleteAsync(`${getBaseDir()}/${MD5(uri)}.jpg`, {idempotent: true});
     }
 
     return FileSystem.deleteAsync(
-        `${getTempDir()}${key}`,
+        `${getTempDir()}/${MD5(uri)}.jpg`,
         {idempotent: true}
     );
 };
 
-const getCacheEntry = async (uri: string): Promise<{ exists: boolean, path: string, tmpPath: string }> => {
-    const path = `${BASE_DIR}${SHA1(uri)}`;
-    const tmpPath = `${TEMP_DIR}${SHA1(uri)}`;
+const getCacheEntry = async (uri: string, permanent: boolean): Promise<{ exists: boolean, path: string, tmpPath: string }> => {
+    const path = `${getBaseDir()}/${MD5(uri)}.jpg`;
+    const tmpPath = `${getTempDir()}/${MD5(uri)}.jpg`;
     try {
-        await FileSystem.makeDirectoryAsync(TEMP_DIR);
-        await FileSystem.makeDirectoryAsync(BASE_DIR);
+        await FileSystem.makeDirectoryAsync(getTempDir());
+        await FileSystem.makeDirectoryAsync(getBaseDir());
     } catch (e) {
         // do nothing
     }
-    const info = await FileSystem.getInfoAsync(path);
+    const info = await FileSystem.getInfoAsync(permanent ? path : tmpPath);
     const {exists} = info;
     return {exists, path, tmpPath};
 };
