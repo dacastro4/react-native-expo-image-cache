@@ -1,12 +1,13 @@
 // @flow
 import * as _ from "lodash";
 import * as React from "react";
-import {Image as RNImage, Animated, StyleSheet, View, Platform} from "react-native";
+import {Image as RNImage, Animated, StyleSheet, View, Platform, Text} from "react-native";
 import {BlurView} from "expo";
-import { type ____ImageStyleProp_Internal as ImageStyle } from "react-native/Libraries/StyleSheet/StyleSheetTypes";
+import {type ____ImageStyleProp_Internal as ImageStyle} from "react-native/Libraries/StyleSheet/StyleSheetTypes";
 import type {ImageSourcePropType} from "react-native/Libraries/Image/ImageSourcePropType";
 
 import CacheManager, {type DownloadOptions} from "./CacheManager";
+import CircleLoader from './CircleLoader';
 
 type ImageProps = {
     style?: ImageStyle,
@@ -16,7 +17,12 @@ type ImageProps = {
     uri: string,
     transitionDuration?: number,
     tint?: "dark" | "light",
-    permanent: boolean
+    permanent: boolean,
+    onLoad: () => {},
+    renderLoader: () => {},
+    loaderOptions: {},
+    containerStyle: {},
+    loader: boolean
 };
 
 type ImageState = {
@@ -31,19 +37,31 @@ export default class Image extends React.Component<ImageProps, ImageState> {
     static defaultProps = {
         transitionDuration: 300,
         tint: "dark",
-        permanent: false
+        permanent: false,
+        loader: false
     };
 
     state = {
         uri: undefined,
-        intensity: new Animated.Value(100)
+        intensity: new Animated.Value(100),
+        downloadProgress: null,
+        ready: false
     };
 
-    async load({uri, options = {}}: ImageProps): Promise<void> {
+    async load({uri, options = {}, onLoad}: ImageProps): Promise<void> {
         if (uri) {
-            const path = await CacheManager.get(uri, options).getPath(this.props.permanent);
+            const path = await CacheManager.get(uri, options)
+                .getPath(this.props.permanent, this.progressDownloadCallback.bind(this));
+
+            if (onLoad && typeof onLoad === "function") {
+                onLoad(path);
+            }
+
             if (this.mounted) {
-                this.setState({ uri: path });
+                this.setState({
+                    uri: path,
+                    ready: true
+                });
             }
         }
     }
@@ -62,7 +80,8 @@ export default class Image extends React.Component<ImageProps, ImageState> {
                 duration: transitionDuration,
                 toValue: 0,
                 useNativeDriver: Platform.OS === "android"
-            }).start();
+            })
+                .start();
         }
     }
 
@@ -70,9 +89,39 @@ export default class Image extends React.Component<ImageProps, ImageState> {
         this.mounted = false;
     }
 
+    progressDownloadCallback(downloadProgress: {}) {
+        const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+        this.setState({
+            downloadProgress: progress
+        });
+    }
+
+    isImageDownloaded = () => this.state.downloadProgress >= 1;
+
+    renderImageLoader = () => {
+        const {style, loaderOptions} = this.props;
+
+        let progress = 0;
+
+        if (this.state.downloadProgress <= 1) {
+            progress = this.state.downloadProgress;
+        } else {
+            progress = Math.floor(this.state.downloadProgress / 100);
+        }
+
+        return (
+            <View {...{style}}>
+                <CircleLoader
+                    progress={progress}
+                    {...loaderOptions}
+                />
+            </View>
+        );
+    };
+
     render(): React.Node {
-        const {preview, style, defaultSource, tint, ...otherProps} = this.props;
-        const {uri, intensity} = this.state;
+        const {preview, style, defaultSource, tint, renderLoader, loader, ...otherProps} = this.props;
+        const {uri, intensity,ready} = this.state;
         const hasDefaultSource = !!defaultSource;
         const hasPreview = !!preview;
         const isImageReady = !!uri;
@@ -85,53 +134,62 @@ export default class Image extends React.Component<ImageProps, ImageState> {
             _.transform(
                 _.pickBy(StyleSheet.flatten(style), (value, key) => propsToCopy.indexOf(key) !== -1),
                 // $FlowFixMe
-                (result, value, key) => Object.assign(result, { [key]: (value - (style.borderWidth || 0)) })
+                (result, value, key) => Object.assign(result, {[key]: (value - (style.borderWidth || 0))})
             )
         ];
-        return (
-            <View {...{style}}>
-                {
-                    (hasDefaultSource && !hasPreview && !isImageReady) && (
-                        <RNImage
-                            source={defaultSource}
-                            style={computedStyle}
-                            {...otherProps}
-                        />
-                    )
-                }
-                {
-                    hasPreview && (
-                        <RNImage
-                            source={preview}
-                            resizeMode="cover"
-                            style={computedStyle}
-                            blurRadius={Platform.OS === "android" ? 0.5 : 0}
-                        />
-                    )
-                }
-                {
-                    isImageReady && (
-                        <RNImage
-                            source={{ uri }}
-                            style={computedStyle}
-                            {...otherProps}
-                        />
-                    )
-                }
-                {
-                    hasPreview && Platform.OS === "ios" && (
-                        <AnimatedBlurView style={computedStyle} {...{intensity, tint}} />
-                    )
-                }
-                {
-                    hasPreview && Platform.OS === "android" && (
-                        <Animated.View
-                            style={[computedStyle, { backgroundColor: tint === "dark" ? black : white, opacity }]}
-                        />
-                    )
-                }
-            </View>
-        );
+
+        if (ready || !loader || this.isImageDownloaded()) {
+            return (
+                <View {...{style}}>
+                    {
+                        (hasDefaultSource && !hasPreview && !isImageReady) && (
+                            <RNImage
+                                source={defaultSource}
+                                style={computedStyle}
+                                {...otherProps}
+                            />
+                        )
+                    }
+                    {
+                        hasPreview && (
+                            <RNImage
+                                source={preview}
+                                resizeMode="cover"
+                                style={computedStyle}
+                                blurRadius={Platform.OS === "android" ? 0.5 : 0}
+                            />
+                        )
+                    }
+                    {
+                        isImageReady && (
+                            <RNImage
+                                source={{uri}}
+                                style={computedStyle}
+                                {...otherProps}
+                            />
+                        )
+                    }
+                    {
+                        hasPreview && Platform.OS === "ios" && (
+                            <AnimatedBlurView style={computedStyle} {...{intensity, tint}} />
+                        )
+                    }
+                    {
+                        hasPreview && Platform.OS === "android" && (
+                            <Animated.View
+                                style={[computedStyle, {backgroundColor: tint === "dark" ? black : white, opacity}]}
+                            />
+                        )
+                    }
+                </View>
+            );
+        }
+
+        if (renderLoader) {
+            return renderLoader();
+        }
+
+        return this.renderImageLoader();
     }
 }
 

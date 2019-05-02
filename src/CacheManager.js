@@ -49,15 +49,19 @@ export class CacheEntry {
             });
     };
 
-    async getPath(permanent: boolean): Promise<?string> {
+    async getPath(permanent: boolean, progressCallback: {}): Promise<?string> {
         this.permanent = permanent;
         const {uri, options} = this;
+
+        if (this.localFile(uri)) {
+            return uri;
+        }
         const {path, exists, tmpPath} = await getCacheEntry(uri, this.permanent);
         if (exists) {
             return permanent ? path : tmpPath;
         }
         this.createBaseDir();
-        const result = await FileSystem.createDownloadResumable(uri, tmpPath, options)
+        const result = await FileSystem.createDownloadResumable(uri, tmpPath, options, progressCallback)
             .downloadAsync();
 
         // If the image download failed, we don't cache anything
@@ -70,6 +74,8 @@ export class CacheEntry {
         }
         return permanent ? path : tmpPath;
     }
+
+    localFile = (uri: string) => !uri.includes("http://", 0) && !uri.includes("https://", 0)
 }
 
 export default class CacheManager {
