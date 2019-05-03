@@ -7,7 +7,7 @@ import {type ____ImageStyleProp_Internal as ImageStyle} from "react-native/Libra
 import type {ImageSourcePropType} from "react-native/Libraries/Image/ImageSourcePropType";
 
 import CacheManager, {type DownloadOptions} from "./CacheManager";
-import CircleLoader from './CircleLoader';
+import CircleLoader from "./CircleLoader";
 
 type ImageProps = {
     style?: ImageStyle,
@@ -121,7 +121,7 @@ export default class Image extends React.Component<ImageProps, ImageState> {
 
     render(): React.Node {
         const {preview, style, defaultSource, tint, renderLoader, loader, ...otherProps} = this.props;
-        const {uri, intensity,ready} = this.state;
+        const {uri, intensity, ready} = this.state;
         const hasDefaultSource = !!defaultSource;
         const hasPreview = !!preview;
         const isImageReady = !!uri;
@@ -129,6 +129,7 @@ export default class Image extends React.Component<ImageProps, ImageState> {
             inputRange: [0, 100],
             outputRange: [0, 0.5]
         });
+        const defaultStyles = {width: "100%", height: "100%"};
         const computedStyle = [
             StyleSheet.absoluteFill,
             _.transform(
@@ -145,7 +146,7 @@ export default class Image extends React.Component<ImageProps, ImageState> {
                         (hasDefaultSource && !hasPreview && !isImageReady) && (
                             <RNImage
                                 source={defaultSource}
-                                style={computedStyle}
+                                style={defaultStyles}
                                 {...otherProps}
                             />
                         )
