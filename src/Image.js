@@ -67,6 +67,7 @@ export default class Image extends React.Component<ImageProps, ImageState> {
     }
 
     componentDidMount() {
+        this.mounted = true;
         this.load(this.props);
     }
 
@@ -91,9 +92,11 @@ export default class Image extends React.Component<ImageProps, ImageState> {
 
     progressDownloadCallback(downloadProgress: {}) {
         const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-        this.setState({
-            downloadProgress: progress
-        });
+        if (this.mounted) {
+            this.setState({
+                downloadProgress: progress
+            });
+        }
     }
 
     isImageDownloaded = () => this.state.downloadProgress >= 1;
