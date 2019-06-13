@@ -2,7 +2,7 @@
 import * as _ from "lodash";
 import * as React from "react";
 import {Image as RNImage, Animated, StyleSheet, View, Platform, Text} from "react-native";
-import {BlurView} from "expo";
+import { BlurView } from 'expo-blur';
 import {type ____ImageStyleProp_Internal as ImageStyle} from "react-native/Libraries/StyleSheet/StyleSheetTypes";
 import type {ImageSourcePropType} from "react-native/Libraries/Image/ImageSourcePropType";
 
