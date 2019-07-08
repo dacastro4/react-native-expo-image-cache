@@ -68,7 +68,7 @@ await CacheManager.clearCache();
  If you want to work in another cache directory, you can setup the cache directory.
 
  ```js
-import {FileSystem} from "expo";
+import * as FileSystem from 'expo-file-system';
 import {CacheManager, setBaseDir} from "react-native-expo-image-cache";
  const uri = "https://www.google.com/favicon.ico"
 setBaseDir(`${FileSystem.cacheDirectory}custom-cache-directoy`);

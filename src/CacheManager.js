@@ -1,5 +1,5 @@
 // @flow
-import {FileSystem} from "expo";
+import * as FileSystem from 'expo-file-system';
 import MD5 from "crypto-js/md5";
 
 export type DownloadOptions = {
